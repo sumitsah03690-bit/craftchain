@@ -4,6 +4,7 @@
 // ──────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
+import { api } from "../api";
 
 /**
  * Returns a human-friendly relative time string.
@@ -38,7 +39,7 @@ export default function ActivityFeed({ projectId }) {
 
     (async () => {
       try {
-        const res = await fetch(`/api/projects/${projectId}/activity?limit=30`);
+        const res = await fetch(api(`/api/projects/${projectId}/activity?limit=30`));
         const json = await res.json();
         if (!cancelled && json.success) {
           setEvents(json.data || []);

@@ -25,7 +25,10 @@ const { connectDB, getReadyStateLabel } = require("./config/db");
 const app = express();
 
 // ── Middleware ───────────────────────────────────
-app.use(cors());              // Allow cross-origin requests (React dev server)
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || "*",  // Set CORS_ORIGIN to your Vercel URL in production
+  credentials: true,
+}));
 app.use(express.json());      // Parse incoming JSON bodies
 
 // ── Routes ──────────────────────────────────────

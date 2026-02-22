@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import MinecraftIcon from "./MinecraftIcon.jsx";
+import { api } from "../api";
 
 /**
  * Format item name for display:
@@ -87,7 +88,7 @@ export default function DependencyTree({ finalItem }) {
     setError(null);
 
     const qty = Math.max(1, Math.floor(quantity));
-    fetch(`/api/recipes/tree?item=${encodeURIComponent(finalItem)}&qty=${qty}`)
+    fetch(api(`/api/recipes/tree?item=${encodeURIComponent(finalItem)}&qty=${qty}`))
       .then((res) => res.json())
       .then((json) => {
         if (cancelled) return;

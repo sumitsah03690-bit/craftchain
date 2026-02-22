@@ -6,10 +6,9 @@
 // ──────────────────────────────────────────────
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { api } from "../api";
 
 const AuthContext = createContext(null);
-
-const API = "/api";
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem("cc_token"));
@@ -31,7 +30,7 @@ export function AuthProvider({ children }) {
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      const res = await fetch(url, { ...options, headers });
+      const res = await fetch(api(url), { ...options, headers });
 
       // ── 401 interception: auto-logout + redirect ──
       if (res.status === 401) {
@@ -59,7 +58,7 @@ export function AuthProvider({ children }) {
 
     (async () => {
       try {
-        const res = await fetch(`${API}/me`, {
+        const res = await fetch(api("/api/me"), {
           headers: { Authorization: `Bearer ${token}` },
         });
         const json = await res.json();
@@ -91,7 +90,7 @@ export function AuthProvider({ children }) {
 
   // ── login ──────────────────────────────────────
   const login = async (emailOrUsername, password) => {
-    const res = await fetch(`${API}/auth/login`, {
+    const res = await fetch(api("/api/auth/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ emailOrUsername, password }),
@@ -110,7 +109,7 @@ export function AuthProvider({ children }) {
 
   // ── signup ─────────────────────────────────────
   const signup = async (username, email, password) => {
-    const res = await fetch(`${API}/auth/register`, {
+    const res = await fetch(api("/api/auth/register"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, email, password }),

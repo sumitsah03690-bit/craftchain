@@ -8,6 +8,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
+import { api } from "../api";
 import ProjectHeader from "../components/ProjectHeader.jsx";
 import ItemCard from "../components/ItemCard.jsx";
 import ContributionModal from "../components/ContributionModal.jsx";
@@ -47,7 +48,7 @@ export default function ProjectPage() {
   // ── Fetch project data ──────────────────────
   const fetchProject = useCallback(async () => {
     try {
-      const res = await fetch(`/api/projects/${id}`);
+      const res = await fetch(api(`/api/projects/${id}`));
 
       if (res.status === 404) {
         setError("Project not found.");

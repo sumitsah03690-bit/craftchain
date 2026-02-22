@@ -6,6 +6,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
+import { api } from "../api";
 import MinecraftIcon from "../components/MinecraftIcon.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
 
@@ -61,7 +62,7 @@ export default function Dashboard() {
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/recipes/search?q=${encodeURIComponent(searchQuery)}`
+          api(`/api/recipes/search?q=${encodeURIComponent(searchQuery)}`)
         );
         const json = await res.json();
         if (json.success) {
@@ -99,7 +100,7 @@ export default function Dashboard() {
     setResolving(true);
     try {
       const res = await fetch(
-        `/api/recipes/lookup?item=${encodeURIComponent(item.name)}`
+        api(`/api/recipes/lookup?item=${encodeURIComponent(item.name)}`)
       );
       const json = await res.json();
       if (json.success && json.data.items?.length > 0) {
