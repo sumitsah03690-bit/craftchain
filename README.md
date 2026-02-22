@@ -1,144 +1,201 @@
-# 🔗 CraftChain
+<p align="center">
+  <img src="docs/screenshots/signup.png" alt="CraftChain Signup" width="700" />
+</p>
 
-**CraftChain** is a collaborative project-management platform built during a hackathon. It uses a **React** frontend (Vite) and a **Node.js / Express** backend connected to **MongoDB**. The entire repo is an npm-workspaces mono-repo so you can install everything and start both servers with a single command.
+<h1 align="center">⛏ CraftChain</h1>
+
+<p align="center">
+  <strong>Collaborative Minecraft Crafting Project Manager</strong><br/>
+  Plan builds, assign roles, track materials, and craft together — in real time.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19-61dafb?logo=react" alt="React" />
+  <img src="https://img.shields.io/badge/Vite-7-646cff?logo=vite" alt="Vite" />
+  <img src="https://img.shields.io/badge/Express-4-000?logo=express" alt="Express" />
+  <img src="https://img.shields.io/badge/MongoDB-Atlas-47a248?logo=mongodb" alt="MongoDB" />
+  <img src="https://img.shields.io/badge/JWT-Auth-fb015b?logo=jsonwebtokens" alt="JWT" />
+</p>
 
 ---
 
-## Quick Start
+## 📸 Screenshots
+
+### Dashboard — All Projects at a Glance
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="CraftChain Dashboard" width="800" />
+</p>
+
+> Browse all crafting projects with live progress percentages, Minecraft item icons, and quick navigation. Create new projects with a single click.
+
+### Project View — Full Build Management
+
+<p align="center">
+  <img src="docs/screenshots/project-view.jpeg" alt="CraftChain Project View" width="800" />
+</p>
+
+> Each project shows a **stats strip**, **suggested tasks** based on your role, **item cards** with bottleneck detection, an interactive **crafting tree**, **plan history** with version restore, **team roles**, **activity feed**, **contribution tracking**, and **bottleneck highlights** — all on one page.
+
+---
+
+## ✨ Features
+
+| Feature                      | Description                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 🔍 **Minecraft Auto-Fill**   | Search any Minecraft item → auto-generate the full dependency tree using `minecraft-data`                       |
+| 📊 **Crafting Tree**         | Interactive, expandable tree showing ingredient quantities with scaling                                         |
+| 👥 **Team Roles**            | Assign members as ⛏ **Miner**, 🧱 **Builder**, or 📋 **Planner**                                                |
+| 🎯 **Suggested Tasks**       | Smart, role-based task suggestions (Miners → raw materials, Builders → craftable items, Planners → bottlenecks) |
+| 📦 **Contribution Tracking** | Contribute items with optimistic UI updates + atomic rollback safety                                            |
+| ⚠ **Bottleneck Detection**   | Automatic identification of blocking items with visual highlights                                               |
+| 📜 **Plan Versioning**       | Every plan update is snapshotted. Owner can restore any previous version                                        |
+| 📈 **Stats Strip**           | Real-time completion percentage, blocked/pending counts                                                         |
+| 🔐 **JWT Auth**              | Secure registration + login with hashed passwords                                                               |
+| 🎮 **Demo Mode**             | Graceful fallback with static data when backend is unavailable                                                  |
+
+---
+
+## 🚀 Quick Start
 
 ```bash
-# 1. Clone the repo
-git clone <your-repo-url> craftchain
+# 1. Clone
+git clone https://github.com/sumitsah03690-bit/craftchain.git
 cd craftchain
 
-# 2. Create your .env file (then edit it — see below)
+# 2. Configure environment
 cp .env.example .env
+# Edit .env → add your MONGODB_URI and JWT_SECRET
 
 # 3. Install all dependencies (root + server + client)
 npm install
 
-# 4. Start both dev servers (API on :4000, React on :5173)
+# 4. Start both dev servers
 npm run dev
 ```
 
-After running `npm run dev` you should see:
-
 | Service      | URL                                                                  |
 | ------------ | -------------------------------------------------------------------- |
-| React client | [http://localhost:5173](http://localhost:5173)                       |
-| API health   | [http://localhost:4000/api/health](http://localhost:4000/api/health) |
+| React Client | [http://localhost:5173](http://localhost:5173)                       |
+| API Server   | [http://localhost:4000/api/health](http://localhost:4000/api/health) |
 
 ---
 
-## How It Works
-
-The root `package.json` declares two npm **workspaces**: `server/` and `client/`. When you run `npm install` at the root, npm resolves dependencies for both workspaces in one go. The `dev` script uses **concurrently** to start the Express server (via `nodemon`) and the Vite dev server in parallel — so you only need one terminal.
-
----
-
-## MongoDB Setup
-
-1. **Atlas (recommended for quick start):** Create a free cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas), get your connection string, and paste it into `.env` as `MONGODB_URI`.
-2. **Local MongoDB:** Install MongoDB Community Server, start `mongod`, and set `MONGODB_URI=mongodb://localhost:27017/craftchain` in `.env`.
-
-> The server will start even without a `MONGODB_URI` (the health route still works), but database-dependent features won't function until you add one.
-
----
-
-## Folder Structure
+## 🏗 Architecture
 
 ```
 CRAFTCHAIN/
-├── client/                # Vite + React frontend
+├── client/                    # React + Vite frontend
 │   ├── src/
-│   │   ├── main.jsx       # React entry — BrowserRouter wraps App
-│   │   ├── App.jsx        # Nav + route definitions
-│   │   └── pages/         # Placeholder page components
-│   │       ├── Login.jsx
-│   │       ├── Dashboard.jsx
-│   │       └── Project.jsx
-│   └── index.html
-├── server/                # Express API backend
-│   └── server.js          # Entry — Mongoose, health route
-├── .env.example           # Template for environment variables
-├── .gitignore
-├── dev-setup.sh           # One-liner env setup script
-├── package.json           # Root workspace config
-└── README.md              # ← You are here
+│   │   ├── components/        # Reusable UI components
+│   │   │   ├── ItemCard.jsx         # Item with bottleneck badges
+│   │   │   ├── DependencyTree.jsx   # Interactive crafting tree
+│   │   │   ├── RoleManager.jsx      # Team role assignment panel
+│   │   │   ├── SuggestedTasks.jsx   # Role-based task suggestions
+│   │   │   ├── PlanHistory.jsx      # Version timeline + restore
+│   │   │   ├── ContributionModal.jsx
+│   │   │   ├── ActivityFeed.jsx
+│   │   │   └── MinecraftIcon.jsx    # Auto-loads item sprites
+│   │   ├── pages/
+│   │   │   ├── Dashboard.jsx        # Project grid + search + create
+│   │   │   ├── ProjectPage.jsx      # Full project management view
+│   │   │   ├── Login.jsx
+│   │   │   └── Signup.jsx
+│   │   ├── contexts/
+│   │   │   └── AuthContext.jsx      # JWT auth + authFetch wrapper
+│   │   └── index.css                # Global styles + design system
+│   └── public/assets/items/         # 197 Minecraft item sprites
+│
+├── server/                    # Express API backend
+│   ├── models/
+│   │   ├── User.js                  # Username, email, bcrypt hash
+│   │   └── Project.js               # Items, members, roles, versions
+│   ├── routes/
+│   │   ├── auth.js                  # POST /register, /login
+│   │   ├── projects.js              # Full CRUD + contribute + roles
+│   │   └── recipes.js               # Minecraft recipe lookup
+│   ├── utils/
+│   │   ├── minecraft.js             # Auto-fill engine (minecraft-data)
+│   │   └── projectHelpers.js        # Status engine, bottlenecks
+│   └── middleware/
+│       └── authMiddleware.js        # JWT verification
+│
+├── .env.example
+└── package.json               # npm workspaces monorepo
 ```
 
-**Where to continue building:**
+---
 
-- **Auth:** Create `server/routes/auth.js` and add JWT login/register endpoints; mount them in `server.js`.
-- **Models:** Add Mongoose models in `server/models/` (e.g., `User.js`, `Project.js`).
-- **Frontend pages:** Replace the placeholder components in `client/src/pages/` with real forms and data fetching.
+## 🔌 API Endpoints
+
+### Auth
+
+| Method | Route                | Description       |
+| ------ | -------------------- | ----------------- |
+| POST   | `/api/auth/register` | Create account    |
+| POST   | `/api/auth/login`    | Login → JWT token |
+
+### Projects
+
+| Method | Route                                    | Description                       |
+| ------ | ---------------------------------------- | --------------------------------- |
+| POST   | `/api/projects`                          | Create project (with auto-fill)   |
+| GET    | `/api/projects`                          | List projects (paginated)         |
+| GET    | `/api/projects/:id`                      | Full detail + roles + suggestions |
+| PUT    | `/api/projects/:id`                      | Update project                    |
+| POST   | `/api/projects/:id/join`                 | Join with optional role           |
+| POST   | `/api/projects/:id/contribute`           | Contribute items (atomic)         |
+| PATCH  | `/api/projects/:id/members/:userId/role` | Assign role (owner only)          |
+| POST   | `/api/projects/:id/update-plan`          | Update plan with versioning       |
+| GET    | `/api/projects/:id/plan-history`         | Version history                   |
+| POST   | `/api/projects/:id/restore-plan/:v`      | Restore previous version          |
+| DELETE | `/api/projects/:id`                      | Delete project                    |
+
+### Recipes
+
+| Method | Route                          | Description              |
+| ------ | ------------------------------ | ------------------------ |
+| GET    | `/api/recipes/search?q=`       | Search Minecraft items   |
+| GET    | `/api/recipes/lookup?item=`    | Get recipe + ingredients |
+| GET    | `/api/recipes/tree?item=&qty=` | Full dependency tree     |
 
 ---
 
-## Environment Variables
+## ⚙ Environment Variables
 
-| Variable      | Description                                | Default                 |
-| ------------- | ------------------------------------------ | ----------------------- |
-| `MONGODB_URI` | MongoDB connection string                  | _(none)_                |
-| `JWT_SECRET`  | Secret key for signing JWTs                | `change-me-...`         |
-| `PORT`        | Express server port                        | `4000`                  |
-| `CLIENT_URL`  | React client origin (for CORS / redirects) | `http://localhost:5173` |
-
----
-
-## Available Scripts
-
-| Command         | What it does                                       |
-| --------------- | -------------------------------------------------- |
-| `npm run dev`   | Starts **both** client and server in dev mode      |
-| `npm run build` | Builds the React client for production (`dist/`)   |
-| `npm run start` | Starts the Express server with `node` (production) |
+| Variable      | Description                | Default                 |
+| ------------- | -------------------------- | ----------------------- |
+| `MONGODB_URI` | MongoDB connection string  | _(required)_            |
+| `JWT_SECRET`  | Secret for signing JWTs    | `change-me-...`         |
+| `PORT`        | Express server port        | `4000`                  |
+| `CLIENT_URL`  | React client origin (CORS) | `http://localhost:5173` |
 
 ---
 
-## Tech Stack
+## 🧰 Tech Stack
 
-- **Frontend:** React 19, Vite, React Router
-- **Backend:** Node.js, Express
-- **Database:** MongoDB + Mongoose
-- **Auth (planned):** JWT (`jsonwebtoken` + `bcrypt`)
-
-## Minecraft Auto-Fill (Optional)
-
-CraftChain can auto-populate a project's items list from a Minecraft final item using the `minecraft-data` package.
-
-### Installation
-
-```bash
-# Inside the server/ workspace
-cd server && npm install minecraft-data
-```
-
-### Usage
-
-```js
-const { initMinecraft, buildDependencyList } = require("../utils/minecraft");
-
-// Call once at startup (idempotent — safe to call multiple times)
-await initMinecraft();
-
-// Auto-fill items for a project
-const items = await buildDependencyList("diamond_pickaxe", { depthLimit: 1 });
-if (!items) {
-  // Fallback: ask user to provide items manually
-}
-```
-
-When creating a project via `POST /api/projects`, set `autoFillFromMinecraft: true` and the backend will attempt auto-fill automatically.
-
-### Performance Notes
-
-- `minecraft-data` loads a lot of JSON. `initMinecraft()` is called once and reused.
-- `buildDependencyList` results are cached in-memory (5-minute TTL).
-- Recursion is capped by `depthLimit` and `maxNodes` to avoid large trees.
+- **Frontend:** React 19 · Vite 7 · React Router · CSS custom properties
+- **Backend:** Node.js · Express · Mongoose · JWT + bcrypt
+- **Database:** MongoDB Atlas
+- **Game Data:** `minecraft-data` npm package (1.19 recipes)
+- **Deployment:** Vercel (frontend) · Render/Railway (backend)
 
 ---
 
-## License
+## 📜 Available Scripts
+
+| Command         | Description                       |
+| --------------- | --------------------------------- |
+| `npm run dev`   | Start client + server in parallel |
+| `npm run build` | Production build (Vite)           |
+| `npm run start` | Start Express (production)        |
+
+---
+
+## 👥 Team
+
+Built during a hackathon by the CraftChain team.
+
+## 📄 License
 
 MIT — hack away! 🚀
