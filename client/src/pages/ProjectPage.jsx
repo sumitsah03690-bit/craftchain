@@ -6,10 +6,11 @@
 // and robust error handling.
 // ──────────────────────────────────────────────
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../contexts/AuthContext.jsx";
+import ConfirmModal from "../components/ConfirmModal.jsx";
 import ProjectHeader from "../components/ProjectHeader.jsx";
 import ItemCard from "../components/ItemCard.jsx";
 import ContributionModal from "../components/ContributionModal.jsx";
@@ -25,6 +26,7 @@ import demoData from "../data/demoProject.json";
 export default function ProjectPage() {
   const { id } = useParams();
   const { user, authFetch } = useAuth();
+  const navigate = useNavigate();
 
   const [project, setProject] = useState(null);
   const [progress, setProgress] = useState(null);
@@ -53,13 +55,21 @@ export default function ProjectPage() {
   // Track which item IDs just transitioned to completed
   const [justCompletedIds, setJustCompletedIds] = useState(new Set());
 
+  // ── Quantity state (single source of truth) ──
+  const [quantity, setQuantity] = useState(1);
+
+  // ── Delete project state ────────────────────
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // ── Fetch project data ──────────────────────
   const fetchProject = useCallback(async () => {
     try {
-      const res = await fetch(api(`/api/projects/${id}`));
+      const res = await authFetch(`/api/projects/${id}`);
 
-      if (res.status === 404) {
-        setError("Project not found.");
+      if (res.status === 404 || res.status === 403) {
+        const json = await res.json();
+        setError(json.message || "Project not found or access denied.");
         setProject(null);
         return;
       }
@@ -93,7 +103,7 @@ export default function ProjectPage() {
     } finally {
       setLoading(false);
     }
-  }, [id, project]);
+  }, [id, project, authFetch]);
 
   useEffect(() => {
     fetchProject();
@@ -202,6 +212,17 @@ export default function ProjectPage() {
 
   // ── Compute stats from project items ────────
   const items = project?.items || [];
+
+  // Scale quantityRequired by the crafting-tree quantity
+  const scaledItems = useMemo(
+    () =>
+      items.map((item) => ({
+        ...item,
+        quantityRequired: (item.quantityRequired || 0) * quantity,
+      })),
+    [items, quantity]
+  );
+
   const totalItems = items.length;
   const completedCount = items.filter((i) => i.status === "completed").length;
   const blockedCount = items.filter((i) => i.status === "blocked").length;
@@ -259,6 +280,24 @@ export default function ProjectPage() {
       <div className="project-main">
         <ProjectHeader project={project} progress={progress} />
 
+        {/* ── Project Info Bar ─────────────────── */}
+        <div className="project-info-bar">
+          {project.joinCode && (
+            <span className="project-join-code">
+              Join Code: <code>{project.joinCode}</code>
+            </span>
+          )}
+          {user && project.createdBy && String(project.createdBy) === String(user.id) && (
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deleting}
+            >
+              🗑 Delete Project
+            </button>
+          )}
+        </div>
+
         {/* ── Stats Strip ─────────────────────── */}
         <div className="stats-strip" aria-label="Project statistics">
           <div className="stat-item">
@@ -300,9 +339,9 @@ export default function ProjectPage() {
         />
 
         {/* Items Grid */}
-        <div className="section-title">Items Required</div>
+        <div className="section-title">Items Required{quantity > 1 ? ` (×${quantity})` : ""}</div>
         <div className="items-grid">
-          {items.map((item) => {
+          {scaledItems.map((item) => {
             const key = item._id || item.name;
             const normName = item.name.toLowerCase().trim();
             return (
@@ -319,7 +358,11 @@ export default function ProjectPage() {
         </div>
 
         {/* Dependency Tree */}
-        <DependencyTree finalItem={project.finalItem} />
+        <DependencyTree
+          finalItem={project.finalItem}
+          quantity={quantity}
+          onQuantityChange={setQuantity}
+        />
 
         {/* Plan History */}
         <PlanHistory
@@ -413,6 +456,31 @@ export default function ProjectPage() {
         message={toast.message}
         visible={toast.visible}
         onDone={() => setToast({ visible: false, message: "" })}
+      />
+
+      {/* ── Delete Project Confirmation ────────── */}
+      <ConfirmModal
+        open={showDeleteConfirm}
+        title="Delete Project?"
+        message={`This will permanently delete "${project.name}" and all its data (items, contributions, history). This cannot be undone.`}
+        confirmText={deleting ? "Deleting..." : "Delete Forever"}
+        danger
+        onConfirm={async () => {
+          setDeleting(true);
+          try {
+            const res = await authFetch(`/api/projects/${id}`, { method: "DELETE" });
+            const json = await res.json();
+            if (json.success) {
+              navigate("/dashboard");
+            }
+          } catch {
+            // ignore
+          } finally {
+            setDeleting(false);
+            setShowDeleteConfirm(false);
+          }
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
       />
     </div>
   );

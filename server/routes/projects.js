@@ -2,7 +2,10 @@ const express = require("express");
 const mongoose = require("mongoose");
 const Project = require("../models/Project");
 const User = require("../models/User");
+const Server = require("../models/Server");
 const authMiddleware = require("../middleware/authMiddleware");
+const membershipMiddleware = require("../middleware/membershipMiddleware");
+const generateJoinCode = require("../utils/joinCode");
 const {
   computeItemStatuses,
   computeProgress,
@@ -13,7 +16,7 @@ const {
 const router = express.Router();
 
 // Valid assignable roles (owner excluded — can't be assigned)
-const ASSIGNABLE_ROLES = ["member", "miner", "builder", "planner"];
+const ASSIGNABLE_ROLES = ["moderator", "member", "miner", "builder", "planner"];
 
 // ─────────────────────────────────────────────────
 // Helper: optionally parse auth but don't reject
@@ -192,7 +195,7 @@ function computeSuggestedTasks(project, role) {
 // ═══════════════════════════════════════════════
 router.post("/", authMiddleware, async (req, res) => {
   try {
-    const { name, finalItem, items: rawItems, autoFillFromMinecraft } = req.body;
+    const { name, finalItem, items: rawItems, autoFillFromMinecraft, serverId } = req.body;
 
     // ── Validate required fields ──────────────
     if (!name || typeof name !== "string" || name.trim() === "") {
@@ -200,6 +203,28 @@ router.post("/", authMiddleware, async (req, res) => {
     }
     if (!finalItem || typeof finalItem !== "string" || finalItem.trim() === "") {
       return res.status(400).json({ success: false, message: "finalItem is required." });
+    }
+
+    // ── Validate serverId if provided ─────────
+    let validServerId = null;
+    if (serverId) {
+      if (!mongoose.Types.ObjectId.isValid(serverId)) {
+        return res.status(400).json({ success: false, message: "Invalid server ID." });
+      }
+      const server = await Server.findById(serverId);
+      if (!server) {
+        return res.status(404).json({ success: false, message: "Server not found." });
+      }
+      // Verify caller is a member of the server
+      const isServerMember = server.owner.toString() === req.user.id.toString() ||
+        (server.members || []).some((m) => m.toString() === req.user.id.toString());
+      if (!isServerMember) {
+        return res.status(403).json({
+          success: false,
+          message: "You must be a member of the server to create a project in it.",
+        });
+      }
+      validServerId = server._id;
     }
 
     // ── Resolve items (autofill or manual) ────
@@ -259,6 +284,9 @@ router.post("/", authMiddleware, async (req, res) => {
       name: name.trim(),
       finalItem: finalItem.trim(),
       createdBy: req.user.id,
+      serverId: validServerId,
+      joinCode: generateJoinCode(),
+      visibility: "private",
       members: [{ userId: req.user.id, role: "owner" }],
       items,
       contributions: [],
@@ -295,27 +323,23 @@ router.post("/", authMiddleware, async (req, res) => {
 // ═══════════════════════════════════════════════
 // GET /api/projects — List projects (paginated)
 // ═══════════════════════════════════════════════
-router.get("/", optionalAuth, async (req, res) => {
+router.get("/", authMiddleware, async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
     const skip = Math.max(parseInt(req.query.skip, 10) || 0, 0);
-    const mineOnly = req.query.mineOnly === "true";
+    const serverId = req.query.serverId || null;
 
-    let filter = {};
+    // Only return projects the user is a member of
+    let filter = {
+      $or: [
+        { createdBy: req.user.id },
+        { "members.userId": req.user.id },
+      ],
+    };
 
-    if (mineOnly) {
-      if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          message: "Authentication required for mineOnly filter.",
-        });
-      }
-      filter = {
-        $or: [
-          { createdBy: req.user.id },
-          { "members.userId": req.user.id },
-        ],
-      };
+    // Optionally filter by server
+    if (serverId && mongoose.Types.ObjectId.isValid(serverId)) {
+      filter.serverId = serverId;
     }
 
     const [projects, total] = await Promise.all([
@@ -334,6 +358,8 @@ router.get("/", optionalAuth, async (req, res) => {
         name: p.name,
         finalItem: p.finalItem,
         createdBy: p.createdBy,
+        serverId: p.serverId || null,
+        joinCode: p.joinCode || null,
         progressPercent: progress.percent,
       };
     });
@@ -349,7 +375,7 @@ router.get("/", optionalAuth, async (req, res) => {
 // GET /api/projects/:id — Full project detail
 // ═══════════════════════════════════════════════
 // Enhanced with memberRoles + suggestedTasks.
-router.get("/:id", optionalAuth, async (req, res) => {
+router.get("/:id", authMiddleware, membershipMiddleware(), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: "Invalid project ID." });
@@ -836,6 +862,8 @@ router.post("/:id/restore-plan/:version", authMiddleware, async (req, res) => {
 // ═══════════════════════════════════════════════
 // DELETE /api/projects/:id — Delete project
 // ═══════════════════════════════════════════════
+// Owner only. Safely deletes project + cleans up
+// related data. No orphan data will remain.
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -854,11 +882,76 @@ router.delete("/:id", authMiddleware, async (req, res) => {
       });
     }
 
+    // Delete the project
     await Project.findByIdAndDelete(req.params.id);
 
-    return res.json({ success: true, message: "Deleted" });
+    return res.json({
+      success: true,
+      message: "Project and all related data deleted successfully.",
+      deletedProjectId: req.params.id,
+    });
   } catch (err) {
     console.error("DELETE /api/projects/:id error:", err);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══════════════════════════════════════════════
+// POST /api/projects/join-by-code — Join via code
+// ═══════════════════════════════════════════════
+router.post("/join-by-code", authMiddleware, async (req, res) => {
+  try {
+    const { code } = req.body;
+
+    if (!code || typeof code !== "string" || code.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Join code is required.",
+      });
+    }
+
+    const project = await Project.findOne({ joinCode: code.trim() });
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid join code. No project found.",
+      });
+    }
+
+    const userId = req.user.id.toString();
+    const alreadyMember = project.members.some(
+      (m) => m.userId.toString() === userId
+    );
+
+    if (alreadyMember) {
+      return res.status(409).json({
+        success: false,
+        message: "You are already a member of this project.",
+      });
+    }
+
+    project.members.push({ userId: req.user.id, role: "member" });
+
+    // Push "join" event
+    pushEvent(project, {
+      type: "join",
+      actor: { id: req.user.id, username: req.user.username },
+      message: `${req.user.username} joined via invite code`,
+    });
+
+    await project.save();
+
+    return res.json({
+      success: true,
+      message: `Joined project "${project.name}" successfully.`,
+      data: {
+        projectId: project._id,
+        name: project.name,
+        members: project.members,
+      },
+    });
+  } catch (err) {
+    console.error("POST /api/projects/join-by-code error:", err);
     return res.status(500).json({ success: false, message: "Server error." });
   }
 });

@@ -2,7 +2,8 @@
 // CraftChain — Root App Component
 // ──────────────────────────────────────────────
 // Discord-style 3-panel layout with protected
-// routes and Minecraft-themed visuals.
+// routes, server hierarchy, and Minecraft-themed
+// visuals.
 // ──────────────────────────────────────────────
 
 import { Routes, Route, Navigate } from "react-router-dom";
@@ -14,6 +15,8 @@ import Signup from "./pages/Signup.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import ProjectPage from "./pages/ProjectPage.jsx";
 import HomePage from "./pages/HomePage.jsx";
+import ServerListPage from "./pages/ServerListPage.jsx";
+import ServerPage from "./pages/ServerPage.jsx";
 
 // ── Protected Route Wrapper ────────────────────
 function ProtectedRoute({ children }) {
@@ -76,6 +79,28 @@ function App() {
             <ProtectedRoute>
               <AppShell>
                 <ProjectPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/servers"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <div className="main-content">
+                  <ServerListPage />
+                </div>
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/servers/:id"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <ServerPage />
               </AppShell>
             </ProtectedRoute>
           }

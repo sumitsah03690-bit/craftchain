@@ -50,6 +50,9 @@ app.use("/api/auth", require("./routes/auth"));
 // ── Project CRUD routes ─────────────────────────
 app.use("/api/projects", require("./routes/projects"));
 
+// ── Server (group) routes ───────────────────────
+app.use("/api/servers", require("./routes/servers"));
+
 // ── Recipe lookup routes ────────────────────
 app.use("/api/recipes", require("./routes/recipes"));
 

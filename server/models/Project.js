@@ -11,6 +11,7 @@
 // ──────────────────────────────────────────────
 
 const mongoose = require("mongoose");
+const generateJoinCode = require("../utils/joinCode");
 
 // ── Item sub-schema ─────────────────────────────
 // Each item represents one material the project needs.
@@ -83,7 +84,7 @@ const ContributionSchema = new mongoose.Schema(
 );
 
 // ── Member sub-schema ───────────────────────────
-const VALID_ROLES = ["owner", "member", "miner", "builder", "planner"];
+const VALID_ROLES = ["owner", "moderator", "member", "miner", "builder", "planner"];
 
 const MemberSchema = new mongoose.Schema(
   {
@@ -163,6 +164,21 @@ const ProjectSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  serverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Server",
+    default: null,
+  },
+  joinCode: {
+    type: String,
+    unique: true,
+    default: generateJoinCode,
+  },
+  visibility: {
+    type: String,
+    enum: ["private"],
+    default: "private",
+  },
   members: {
     type: [MemberSchema],
     default: [],
@@ -192,5 +208,8 @@ const ProjectSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+// Index for fast join-code lookups
+ProjectSchema.index({ joinCode: 1 });
 
 module.exports = mongoose.model("Project", ProjectSchema);

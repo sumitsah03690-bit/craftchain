@@ -9,6 +9,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { api } from "../api";
 import MinecraftIcon from "../components/MinecraftIcon.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
+import JoinByCodeModal from "../components/JoinByCodeModal.jsx";
 
 export default function Dashboard() {
   const { authFetch } = useAuth();
@@ -31,6 +32,11 @@ export default function Dashboard() {
   const searchRef = useRef(null);
   const debounceRef = useRef(null);
 
+  // ── Join by code state ────────────────────────
+  const [showJoin, setShowJoin] = useState(false);
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinError, setJoinError] = useState("");
+
   // ── Fetch projects ────────────────────────────
   const fetchProjects = useCallback(async () => {
     try {
@@ -49,6 +55,33 @@ export default function Dashboard() {
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  // ── Join by code handler ──────────────────────
+  const handleJoinByCode = async (code) => {
+    setJoinLoading(true);
+    setJoinError("");
+    try {
+      const res = await authFetch("/api/projects/join-by-code", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setShowJoin(false);
+        if (json.data?.projectId) {
+          navigate(`/projects/${json.data.projectId}`);
+        } else {
+          fetchProjects();
+        }
+      } else {
+        setJoinError(json.message || "Failed to join.");
+      }
+    } catch {
+      setJoinError("Network error.");
+    } finally {
+      setJoinLoading(false);
+    }
+  };
 
   // ── Search autocomplete (debounced) ───────────
   useEffect(() => {
@@ -198,12 +231,21 @@ export default function Dashboard() {
       {/* ── Create Project ──────────────────────── */}
       <div className="create-project-section">
         {!showCreate ? (
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowCreate(true)}
-          >
-            + New Project
-          </button>
+          <>
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowCreate(true)}
+            >
+              + New Project
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowJoin(true)}
+              style={{ marginLeft: 8 }}
+            >
+              🔗 Join by Code
+            </button>
+          </>
         ) : (
           <div className="create-project-form">
             {/* ── Search Bar ──────────────────── */}
@@ -400,6 +442,20 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      {/* Join by Code Modal */}
+      <JoinByCodeModal
+        open={showJoin}
+        onClose={() => {
+          setShowJoin(false);
+          setJoinError("");
+        }}
+        onJoin={handleJoinByCode}
+        title="Join a Project"
+        placeholder="Enter project invite code..."
+        loading={joinLoading}
+        error={joinError}
+      />
     </div>
   );
 }
