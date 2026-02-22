@@ -6,6 +6,7 @@
 // ──────────────────────────────────────────────
 
 import { Routes, Route, Navigate } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { useAuth } from "./contexts/AuthContext.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Login from "./pages/Login.jsx";
@@ -46,38 +47,41 @@ function AppShell({ children }) {
 
 function App() {
   return (
-    <Routes>
-      {/* ── Public auth routes (no sidebar) ────── */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+    <>
+      <Routes>
+        {/* ── Public auth routes (no sidebar) ────── */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
 
-      {/* ── Protected routes (with sidebar) ────── */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <AppShell>
-              <div className="main-content">
-                <Dashboard />
-              </div>
-            </AppShell>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/projects/:id"
-        element={
-          <ProtectedRoute>
-            <AppShell>
-              <ProjectPage />
-            </AppShell>
-          </ProtectedRoute>
-        }
-      />
+        {/* ── Protected routes (with sidebar) ────── */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <div className="main-content">
+                  <Dashboard />
+                </div>
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects/:id"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <ProjectPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
 
-      {/* ── Default redirect ────────────────────── */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+        {/* ── Default redirect ────────────────────── */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+      <Analytics />
+    </>
   );
 }
 
