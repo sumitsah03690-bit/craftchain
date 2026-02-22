@@ -74,6 +74,9 @@ export default function Login() {
           Don't have an account?{" "}
           <Link to="/signup">Sign up</Link>
         </div>
+        <div className="auth-footer" style={{ marginTop: "8px" }}>
+          <Link to="/">← Back to Home</Link>
+        </div>
       </div>
     </div>
   );

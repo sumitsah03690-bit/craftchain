@@ -89,6 +89,9 @@ export default function Signup() {
           Already have an account?{" "}
           <Link to="/login">Log in</Link>
         </div>
+        <div className="auth-footer" style={{ marginTop: "8px" }}>
+          <Link to="/">← Back to Home</Link>
+        </div>
       </div>
     </div>
   );
