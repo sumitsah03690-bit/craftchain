@@ -1,5 +1,5 @@
-node_modules
-server
+server/
 .env
-*.md
 dev-setup.sh
+CONVERSATION_REPORT.md
+THEME_PROMPT.md
