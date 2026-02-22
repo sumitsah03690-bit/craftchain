@@ -81,9 +81,9 @@ router.get("/lookup", async (req, res) => {
   }
 
   try {
-    // Get the recipe with depth=2 (expand all sub-ingredients)
-    // so every material appears as a contributable project item
-    const deps = await mc.buildDependencyList(itemName, { depthLimit: 2 });
+    // Get the recipe with depth=0 (immediate ingredients only)
+    // to show correct base material counts for the project preview
+    const deps = await mc.buildDependencyList(itemName, { depthLimit: 0 });
 
     if (!deps || !Array.isArray(deps) || deps.length === 0) {
       return res.json({
