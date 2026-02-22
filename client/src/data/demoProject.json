@@ -1,0 +1,85 @@
+{
+  "success": true,
+  "data": {
+    "_id": "demo-project-001",
+    "name": "Diamond Sword (Demo)",
+    "finalItem": "diamond_sword",
+    "createdBy": "demo-user",
+    "members": [{ "userId": "demo-user", "role": "owner" }],
+    "items": [
+      {
+        "_id": "demo-item-1",
+        "name": "Diamond",
+        "quantityRequired": 2,
+        "quantityCollected": 1,
+        "dependencies": [],
+        "status": "pending"
+      },
+      {
+        "_id": "demo-item-2",
+        "name": "Stick",
+        "quantityRequired": 1,
+        "quantityCollected": 1,
+        "dependencies": [],
+        "status": "completed"
+      },
+      {
+        "_id": "demo-item-3",
+        "name": "Oak Planks",
+        "quantityRequired": 2,
+        "quantityCollected": 2,
+        "dependencies": [],
+        "status": "completed"
+      },
+      {
+        "_id": "demo-item-4",
+        "name": "Oak Log",
+        "quantityRequired": 1,
+        "quantityCollected": 0,
+        "dependencies": ["Oak Planks"],
+        "status": "blocked"
+      },
+      {
+        "_id": "demo-item-5",
+        "name": "Iron Ingot",
+        "quantityRequired": 3,
+        "quantityCollected": 0,
+        "dependencies": [],
+        "status": "pending"
+      }
+    ],
+    "contributions": [],
+    "events": [
+      {
+        "_id": "demo-evt-1",
+        "type": "create",
+        "actor": { "id": "demo-user", "username": "Steve" },
+        "message": "Steve created the project",
+        "timestamp": "2026-02-21T10:00:00.000Z"
+      },
+      {
+        "_id": "demo-evt-2",
+        "type": "contribution",
+        "actor": { "id": "demo-user", "username": "Steve" },
+        "message": "Steve contributed 1 Diamond",
+        "timestamp": "2026-02-21T11:00:00.000Z"
+      },
+      {
+        "_id": "demo-evt-3",
+        "type": "item_completed",
+        "actor": { "id": "demo-user", "username": "Steve" },
+        "message": "Stick is now fully collected!",
+        "timestamp": "2026-02-21T12:00:00.000Z"
+      }
+    ]
+  },
+  "progress": {
+    "percent": 44.4,
+    "completedItems": 2,
+    "totalItems": 5
+  },
+  "bottlenecks": [
+    { "name": "Diamond", "blockingCount": 1, "remaining": 1 },
+    { "name": "Iron Ingot", "blockingCount": 0, "remaining": 3 }
+  ]
+}
