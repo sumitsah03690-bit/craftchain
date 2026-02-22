@@ -8,6 +8,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const Server = require("../models/Server");
 const Project = require("../models/Project");
+const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
 const generateJoinCode = require("../utils/joinCode");
 
@@ -126,12 +127,50 @@ router.get("/:id", authMiddleware, async (req, res) => {
       callerRole = "moderator";
     }
 
+    // ── Build populated members list ──────────
+    // Collect all unique user IDs (owner + members)
+    const allMemberIds = new Set();
+    allMemberIds.add(server.owner.toString());
+    for (const m of server.members || []) {
+      allMemberIds.add(m.toString());
+    }
+
+    const users = await User.find({ _id: { $in: [...allMemberIds] } })
+      .select("_id username createdAt")
+      .lean();
+
+    const userMap = {};
+    for (const u of users) {
+      userMap[u._id.toString()] = u;
+    }
+
+    const moderatorSet = new Set(
+      (server.moderators || []).map((m) => m.toString())
+    );
+
+    const membersList = [...allMemberIds].map((uid) => {
+      const u = userMap[uid];
+      let role = "member";
+      if (uid === server.owner.toString()) role = "owner";
+      else if (moderatorSet.has(uid)) role = "moderator";
+      return {
+        _id: uid,
+        username: u ? u.username : "Unknown",
+        role,
+      };
+    });
+
+    // Sort: owner first, then moderators, then members
+    const roleOrder = { owner: 0, moderator: 1, member: 2 };
+    membersList.sort((a, b) => (roleOrder[a.role] || 2) - (roleOrder[b.role] || 2));
+
     return res.json({
       success: true,
       data: {
         ...server,
         callerRole,
         projects,
+        membersList,
       },
     });
   } catch (err) {

@@ -167,9 +167,14 @@ export default function Sidebar() {
       {/* ── Footer ────────────────────────────── */}
       <div className="sidebar-footer">
         {user && (
-          <div className="sidebar-user-info">
+          <div 
+            className="sidebar-user-info card-clickable" 
+            onClick={() => navigate("/account")}
+            style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "10px", padding: "8px", borderRadius: "8px", flex: 1 }}
+            title="View Account"
+          >
             <div className="sidebar-avatar">
-              {user.username ? user.username[0] : "?"}
+              {user.username ? user.username[0].toUpperCase() : "?"}
             </div>
             <span className="sidebar-username">{user.username}</span>
           </div>

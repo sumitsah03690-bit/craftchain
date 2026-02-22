@@ -29,6 +29,7 @@ export default function ServerPage() {
   const [projectName, setProjectName] = useState("");
   const [projectItem, setProjectItem] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
+  const [createProjectError, setCreateProjectError] = useState("");
 
   const fetchServer = useCallback(async () => {
     try {
@@ -71,6 +72,7 @@ export default function ServerPage() {
     e.preventDefault();
     if (!projectName.trim() || !projectItem.trim() || creatingProject) return;
     setCreatingProject(true);
+    setCreateProjectError("");
     try {
       const res = await authFetch("/api/projects", {
         method: "POST",
@@ -79,6 +81,7 @@ export default function ServerPage() {
           finalItem: projectItem.trim(),
           serverId: id,
           autoFillFromMinecraft: true,
+          items: [{ name: projectItem.trim(), quantityRequired: 1 }],
         }),
       });
       const json = await res.json();
@@ -86,10 +89,13 @@ export default function ServerPage() {
         setShowCreateProject(false);
         setProjectName("");
         setProjectItem("");
+        setCreateProjectError("");
         navigate(`/projects/${json.data._id}`);
+      } else {
+        setCreateProjectError(json.message || "Failed to create project.");
       }
     } catch {
-      // ignore
+      setCreateProjectError("Network error. Please try again.");
     } finally {
       setCreatingProject(false);
     }
@@ -180,6 +186,34 @@ export default function ServerPage() {
         </div>
       )}
 
+      {/* Members List */}
+      <h2 className="section-heading" style={{ marginTop: "32px" }}>Members ({server?.membersList?.length || 0})</h2>
+      {(!server?.membersList || server.membersList.length === 0) ? (
+        <div className="empty-state"><p>No members found.</p></div>
+      ) : (
+        <div className="members-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "16px" }}>
+          {server.membersList.map((m) => (
+            <div
+              key={m._id}
+              className="card card-clickable"
+              onClick={() => navigate(`/profile/${m._id}`)}
+              style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px" }}
+              title={`View ${m.username}'s profile`}
+            >
+              <div className="profile-avatar-small" style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", fontWeight: "bold" }}>
+                {m.username[0].toUpperCase()}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <span style={{ fontWeight: "bold", fontSize: "1.1rem" }}>{m.username}</span>
+                <span style={{ fontSize: "0.85rem", color: m.role === "owner" ? "#ffaa00" : m.role === "moderator" ? "#55ffff" : "#aaa", textTransform: "capitalize" }}>
+                  {m.role}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Create Project Modal */}
       {showCreateProject && (
         <div
@@ -210,6 +244,11 @@ export default function ServerPage() {
                 onChange={(e) => setProjectItem(e.target.value)}
                 maxLength={50}
               />
+              {createProjectError && (
+                <div className="auth-error" style={{ marginTop: 12, marginBottom: 8 }}>
+                  {createProjectError}
+                </div>
+              )}
               <div className="confirm-modal-actions">
                 <button
                   type="button"

@@ -56,6 +56,9 @@ app.use("/api/servers", require("./routes/servers"));
 // ── Recipe lookup routes ────────────────────
 app.use("/api/recipes", require("./routes/recipes"));
 
+// ── User profile routes ────────────────────
+app.use("/api/users", require("./routes/users"));
+
 // ── Protected /api/me route ─────────────────────
 const authMiddleware = require("./middleware/authMiddleware");
 const User = require("./models/User");

@@ -17,6 +17,8 @@ import ProjectPage from "./pages/ProjectPage.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import ServerListPage from "./pages/ServerListPage.jsx";
 import ServerPage from "./pages/ServerPage.jsx";
+import ProfilePage from "./pages/ProfilePage.jsx";
+import AccountPage from "./pages/AccountPage.jsx";
 
 // ── Protected Route Wrapper ────────────────────
 function ProtectedRoute({ children }) {
@@ -101,6 +103,26 @@ function App() {
             <ProtectedRoute>
               <AppShell>
                 <ServerPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <AccountPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile/:id"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <ProfilePage />
               </AppShell>
             </ProtectedRoute>
           }
