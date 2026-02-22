@@ -458,7 +458,7 @@ router.get("/:id", authMiddleware, membershipMiddleware(), async (req, res) => {
 // ═══════════════════════════════════════════════
 // PUT /api/projects/:id — Update project
 // ═══════════════════════════════════════════════
-router.put("/:id", authMiddleware, async (req, res) => {
+router.put("/:id", authMiddleware, membershipMiddleware(), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: "Invalid project ID." });
@@ -579,7 +579,7 @@ router.post("/:id/join", authMiddleware, async (req, res) => {
 // ═══════════════════════════════════════════════
 // Assign a role to a member. Owner only.
 // Body: { "role": "miner" }
-router.patch("/:id/members/:userId/role", authMiddleware, async (req, res) => {
+router.patch("/:id/members/:userId/role", authMiddleware, membershipMiddleware(), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: "Invalid project ID." });
@@ -662,7 +662,7 @@ router.patch("/:id/members/:userId/role", authMiddleware, async (req, res) => {
 // Snapshots the current items before replacing.
 // Auth required, owner or planner only.
 // Body: { "items": [...], "label": "v2 — added nether materials" }
-router.post("/:id/update-plan", authMiddleware, async (req, res) => {
+router.post("/:id/update-plan", authMiddleware, membershipMiddleware(), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: "Invalid project ID." });
@@ -741,7 +741,7 @@ router.post("/:id/update-plan", authMiddleware, async (req, res) => {
 // GET /api/projects/:id/plan-history
 // ═══════════════════════════════════════════════
 // Returns the plan version history.
-router.get("/:id/plan-history", async (req, res) => {
+router.get("/:id/plan-history", authMiddleware, membershipMiddleware(), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: "Invalid project ID." });
@@ -779,7 +779,7 @@ router.get("/:id/plan-history", async (req, res) => {
 // ═══════════════════════════════════════════════
 // Restore items from a previous plan version.
 // Owner only. Snapshots current plan first.
-router.post("/:id/restore-plan/:version", authMiddleware, async (req, res) => {
+router.post("/:id/restore-plan/:version", authMiddleware, membershipMiddleware(), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: "Invalid project ID." });
@@ -970,7 +970,7 @@ router.post("/join-by-code", authMiddleware, async (req, res) => {
 //  2. FALLBACK — Atomic findOneAndUpdate.
 //     For single-node MongoDB without replica set.
 // -------------------
-router.post("/:id/contribute", authMiddleware, async (req, res) => {
+router.post("/:id/contribute", authMiddleware, membershipMiddleware(), async (req, res) => {
   try {
     // ── 1. Validate request body ─────────────────
     const { itemName, quantity } = req.body;
@@ -1276,7 +1276,7 @@ router.post("/:id/contribute", authMiddleware, async (req, res) => {
 // ═══════════════════════════════════════════════
 // GET /api/projects/:id/activity — Activity feed
 // ═══════════════════════════════════════════════
-router.get("/:id/activity", async (req, res) => {
+router.get("/:id/activity", authMiddleware, membershipMiddleware(), async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: "Invalid project ID." });

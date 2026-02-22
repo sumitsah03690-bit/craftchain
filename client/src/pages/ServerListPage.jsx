@@ -20,6 +20,7 @@ export default function ServerListPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [createName, setCreateName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
   // Join modal
   const [showJoin, setShowJoin] = useState(false);
@@ -52,6 +53,7 @@ export default function ServerListPage() {
     e.preventDefault();
     if (!createName.trim() || creating) return;
     setCreating(true);
+    setCreateError("");
     try {
       const res = await authFetch("/api/servers", {
         method: "POST",
@@ -61,10 +63,13 @@ export default function ServerListPage() {
       if (json.success) {
         setShowCreate(false);
         setCreateName("");
+        setCreateError("");
         fetchServers();
+      } else {
+        setCreateError(json.message || "Failed to create server.");
       }
     } catch {
-      // ignore
+      setCreateError("Network error. Please try again.");
     } finally {
       setCreating(false);
     }
@@ -126,7 +131,10 @@ export default function ServerListPage() {
         <div className="server-list-actions">
           <button
             className="btn btn-primary"
-            onClick={() => setShowCreate(true)}
+            onClick={() => {
+              setShowCreate(true);
+              setCreateError("");
+            }}
           >
             + Create Server
           </button>
@@ -202,6 +210,11 @@ export default function ServerListPage() {
                 maxLength={50}
                 autoFocus
               />
+              {createError && (
+                <div className="auth-error" style={{ marginTop: 8, marginBottom: 4 }}>
+                  {createError}
+                </div>
+              )}
               <div className="confirm-modal-actions">
                 <button
                   type="button"
