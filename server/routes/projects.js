@@ -1,26 +1,7 @@
-// /server/routes/projects.js
-// ──────────────────────────────────────────────
-// CRUD + contribution + activity routes for
-// CraftChain projects.
-//
-// Mounted at /api/projects (see server.js), so:
-//   POST   /api/projects                – create
-//   GET    /api/projects                – list (paginated)
-//   GET    /api/projects/:id            – detail (computed state)
-//   PUT    /api/projects/:id            – update
-//   POST   /api/projects/:id/join       – join project
-//   POST   /api/projects/:id/contribute – contribute items
-//   GET    /api/projects/:id/activity   – activity feed
-//   DELETE /api/projects/:id            – delete
-//
-// Response format (consistent with auth routes):
-//   Success → { success: true,  data: { ... } }
-//   Error   → { success: false, message: "..." }
-// ──────────────────────────────────────────────
-
 const express = require("express");
 const mongoose = require("mongoose");
 const Project = require("../models/Project");
+const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
 const {
   computeItemStatuses,
@@ -30,6 +11,9 @@ const {
 } = require("../utils/projectHelpers");
 
 const router = express.Router();
+
+// Valid assignable roles (owner excluded — can't be assigned)
+const ASSIGNABLE_ROLES = ["member", "miner", "builder", "planner"];
 
 // ─────────────────────────────────────────────────
 // Helper: optionally parse auth but don't reject
@@ -114,6 +98,95 @@ function pushEvent(project, event) {
   }
 }
 
+// ─────────────────────────────────────────────────
+// Helper: compute role-based task suggestions
+// ─────────────────────────────────────────────────
+function computeSuggestedTasks(project, role) {
+  const items = project.items || [];
+  const suggestions = [];
+
+  // Get pending/incomplete items with remaining quantities
+  const incomplete = items
+    .filter((i) => (i.quantityCollected || 0) < i.quantityRequired)
+    .map((i) => ({
+      itemName: i.name,
+      remaining: i.quantityRequired - (i.quantityCollected || 0),
+      status: i.status,
+      raw: !i.dependencies || i.dependencies.length === 0,
+      deps: i.dependencies || [],
+    }));
+
+  switch (role) {
+    case "miner":
+      // Raw materials — items with no dependencies
+      for (const item of incomplete) {
+        if (item.raw) {
+          suggestions.push({
+            itemName: item.itemName,
+            remaining: item.remaining,
+            reason: "🪨 Raw material — mine/gather this",
+          });
+        }
+      }
+      suggestions.sort((a, b) => b.remaining - a.remaining);
+      break;
+
+    case "builder":
+      // Craftable items with all dependencies met
+      for (const item of incomplete) {
+        if (!item.raw && item.status !== "blocked") {
+          suggestions.push({
+            itemName: item.itemName,
+            remaining: item.remaining,
+            reason: "⚒ Craftable — all materials ready",
+          });
+        }
+      }
+      suggestions.sort((a, b) => b.remaining - a.remaining);
+      break;
+
+    case "planner": {
+      // Bottleneck items — items that are blocking others
+      const depCounts = {};
+      for (const item of items) {
+        for (const dep of item.dependencies || []) {
+          const key = dep.toLowerCase().trim();
+          depCounts[key] = (depCounts[key] || 0) + 1;
+        }
+      }
+      for (const item of incomplete) {
+        const key = item.itemName.toLowerCase().trim();
+        const blocking = depCounts[key] || 0;
+        if (blocking > 0 || item.status === "blocked") {
+          suggestions.push({
+            itemName: item.itemName,
+            remaining: item.remaining,
+            reason: blocking > 0
+              ? `📋 Blocks ${blocking} item${blocking > 1 ? "s" : ""} — prioritize`
+              : "⚠ Blocked — resolve dependencies",
+          });
+        }
+      }
+      suggestions.sort((a, b) => b.remaining - a.remaining);
+      break;
+    }
+
+    default:
+      // Owner / member — top items by remaining
+      for (const item of incomplete) {
+        suggestions.push({
+          itemName: item.itemName,
+          remaining: item.remaining,
+          reason: item.raw ? "🪨 Raw material" : "⚒ Craftable item",
+        });
+      }
+      suggestions.sort((a, b) => b.remaining - a.remaining);
+      break;
+  }
+
+  return suggestions.slice(0, 5);
+}
+
 // ═══════════════════════════════════════════════
 // POST /api/projects — Create a new project
 // ═══════════════════════════════════════════════
@@ -190,6 +263,8 @@ router.post("/", authMiddleware, async (req, res) => {
       items,
       contributions: [],
       events: [],
+      planVersions: [],
+      currentPlanVersion: 1,
       createdAt: new Date(),
     });
 
@@ -273,10 +348,8 @@ router.get("/", optionalAuth, async (req, res) => {
 // ═══════════════════════════════════════════════
 // GET /api/projects/:id — Full project detail
 // ═══════════════════════════════════════════════
-// Uses computeProjectState() for computed statuses,
-// progress, and bottlenecks.  Also returns an
-// activityPreview (last 10 events, newest first).
-router.get("/:id", async (req, res) => {
+// Enhanced with memberRoles + suggestedTasks.
+router.get("/:id", optionalAuth, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: "Invalid project ID." });
@@ -314,12 +387,40 @@ router.get("/:id", async (req, res) => {
       }))
       .sort((a, b) => b.totalContributed - a.totalContributed);
 
+    // ── Build memberRoles list ────────────────
+    const memberIds = (project.members || []).map((m) => m.userId);
+    const users = await User.find({ _id: { $in: memberIds } })
+      .select("_id username")
+      .lean();
+    const userMap = {};
+    for (const u of users) {
+      userMap[String(u._id)] = u.username;
+    }
+    const memberRoles = (project.members || []).map((m) => ({
+      userId: String(m.userId),
+      username: userMap[String(m.userId)] || "Unknown",
+      role: m.role || "member",
+    }));
+
+    // ── Compute suggested tasks for current user ──
+    let suggestedTasks = [];
+    if (req.user) {
+      const callerMember = (project.members || []).find(
+        (m) => String(m.userId) === String(req.user.id)
+      );
+      const callerRole = callerMember ? callerMember.role : "member";
+      suggestedTasks = computeSuggestedTasks(state.projectWithStatuses, callerRole);
+    }
+
     return res.json({
       success: true,
       data: state.projectWithStatuses,
       progress: state.progress,
       bottlenecks: state.bottlenecks,
       contributionSummary,
+      memberRoles,
+      suggestedTasks,
+      currentPlanVersion: project.currentPlanVersion || 1,
       activityPreview,
     });
   } catch (err) {
@@ -420,14 +521,22 @@ router.post("/:id/join", authMiddleware, async (req, res) => {
       });
     }
 
+    // Validate role if provided
     const role = req.body.role || "member";
+    if (!ASSIGNABLE_ROLES.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid role. Must be one of: ${ASSIGNABLE_ROLES.join(", ")}`,
+      });
+    }
+
     project.members.push({ userId: req.user.id, role });
 
     // ── Push "join" event ─────────────────────
     pushEvent(project, {
       type: "join",
       actor: { id: req.user.id, username: req.user.username },
-      message: `${req.user.username} joined the project`,
+      message: `${req.user.username} joined as ${role}`,
     });
 
     await project.save();
@@ -435,6 +544,291 @@ router.post("/:id/join", authMiddleware, async (req, res) => {
     return res.json({ success: true, data: { members: project.members } });
   } catch (err) {
     console.error("POST /api/projects/:id/join error:", err);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══════════════════════════════════════════════
+// PATCH /api/projects/:id/members/:userId/role
+// ═══════════════════════════════════════════════
+// Assign a role to a member. Owner only.
+// Body: { "role": "miner" }
+router.patch("/:id/members/:userId/role", authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid project ID." });
+    }
+
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Project not found." });
+    }
+
+    // Only owner can assign roles
+    const callerMember = project.members.find(
+      (m) => m.userId.toString() === req.user.id.toString()
+    );
+    if (!callerMember || callerMember.role !== "owner") {
+      return res.status(403).json({
+        success: false,
+        message: "Only the project owner can assign roles.",
+      });
+    }
+
+    const { role } = req.body;
+    if (!role || !ASSIGNABLE_ROLES.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid role. Must be one of: ${ASSIGNABLE_ROLES.join(", ")}`,
+      });
+    }
+
+    // Find target member
+    const targetMember = project.members.find(
+      (m) => m.userId.toString() === req.params.userId
+    );
+    if (!targetMember) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found in this project.",
+      });
+    }
+
+    // Can't change the owner's role
+    if (targetMember.role === "owner") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot change the owner's role.",
+      });
+    }
+
+    const oldRole = targetMember.role;
+    targetMember.role = role;
+
+    // Look up the target user's username for the event
+    const targetUser = await User.findById(req.params.userId).select("username").lean();
+    const targetUsername = targetUser ? targetUser.username : "Unknown";
+
+    pushEvent(project, {
+      type: "role_change",
+      actor: { id: req.user.id, username: req.user.username },
+      meta: { itemName: targetUsername },
+      message: `${req.user.username} changed ${targetUsername}'s role from ${oldRole} to ${role}`,
+    });
+
+    await project.save();
+
+    return res.json({
+      success: true,
+      data: { members: project.members },
+      message: `Role updated to ${role}`,
+    });
+  } catch (err) {
+    console.error("PATCH role error:", err);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══════════════════════════════════════════════
+// POST /api/projects/:id/update-plan
+// ═══════════════════════════════════════════════
+// Update the crafting plan (items) with versioning.
+// Snapshots the current items before replacing.
+// Auth required, owner or planner only.
+// Body: { "items": [...], "label": "v2 — added nether materials" }
+router.post("/:id/update-plan", authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid project ID." });
+    }
+
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Project not found." });
+    }
+
+    // Only owner or planner can update the plan
+    const callerMember = project.members.find(
+      (m) => m.userId.toString() === req.user.id.toString()
+    );
+    if (!callerMember || !["owner", "planner"].includes(callerMember.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the project owner or a planner can update the crafting plan.",
+      });
+    }
+
+    const { items: rawItems, label } = req.body;
+    if (!rawItems) {
+      return res.status(400).json({
+        success: false,
+        message: "items array is required.",
+      });
+    }
+
+    const sanitized = sanitizeItems(rawItems);
+    if (sanitized.error) {
+      return res.status(400).json({ success: false, message: sanitized.error });
+    }
+
+    // Snapshot current items into planVersions
+    const currentVersion = project.currentPlanVersion || 1;
+    project.planVersions.push({
+      version: currentVersion,
+      label: `v${currentVersion}`,
+      items: project.items.map((i) => i.toObject ? i.toObject() : { ...i }),
+      createdBy: req.user.id,
+      createdAt: new Date(),
+    });
+
+    // Replace items with new plan
+    project.items = sanitized.items;
+    project.currentPlanVersion = currentVersion + 1;
+
+    // Recompute statuses
+    const computed = computeItemStatuses(project);
+    for (let i = 0; i < project.items.length; i++) {
+      project.items[i].status = computed.items[i].status;
+    }
+
+    pushEvent(project, {
+      type: "plan_update",
+      actor: { id: req.user.id, username: req.user.username },
+      message: `${req.user.username} updated the crafting plan to v${currentVersion + 1}${label ? ` — ${label}` : ""}`,
+    });
+
+    await project.save();
+
+    return res.json({
+      success: true,
+      data: project,
+      currentPlanVersion: project.currentPlanVersion,
+      message: `Plan updated to v${project.currentPlanVersion}`,
+    });
+  } catch (err) {
+    console.error("POST update-plan error:", err);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══════════════════════════════════════════════
+// GET /api/projects/:id/plan-history
+// ═══════════════════════════════════════════════
+// Returns the plan version history.
+router.get("/:id/plan-history", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid project ID." });
+    }
+
+    const project = await Project.findById(req.params.id)
+      .select("planVersions currentPlanVersion")
+      .lean();
+
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Project not found." });
+    }
+
+    const versions = (project.planVersions || []).map((v) => ({
+      version: v.version,
+      label: v.label,
+      itemCount: (v.items || []).length,
+      createdBy: v.createdBy,
+      createdAt: v.createdAt,
+    }));
+
+    return res.json({
+      success: true,
+      data: versions,
+      currentPlanVersion: project.currentPlanVersion || 1,
+    });
+  } catch (err) {
+    console.error("GET plan-history error:", err);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══════════════════════════════════════════════
+// POST /api/projects/:id/restore-plan/:version
+// ═══════════════════════════════════════════════
+// Restore items from a previous plan version.
+// Owner only. Snapshots current plan first.
+router.post("/:id/restore-plan/:version", authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid project ID." });
+    }
+
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Project not found." });
+    }
+
+    // Owner only
+    const callerMember = project.members.find(
+      (m) => m.userId.toString() === req.user.id.toString()
+    );
+    if (!callerMember || callerMember.role !== "owner") {
+      return res.status(403).json({
+        success: false,
+        message: "Only the project owner can restore a plan version.",
+      });
+    }
+
+    const targetVersion = parseInt(req.params.version, 10);
+    const snapshot = (project.planVersions || []).find(
+      (v) => v.version === targetVersion
+    );
+    if (!snapshot) {
+      return res.status(404).json({
+        success: false,
+        message: `Plan version ${targetVersion} not found.`,
+      });
+    }
+
+    // Snapshot current plan before restoring
+    const currentVersion = project.currentPlanVersion || 1;
+    project.planVersions.push({
+      version: currentVersion,
+      label: `v${currentVersion} (before restore)`,
+      items: project.items.map((i) => i.toObject ? i.toObject() : { ...i }),
+      createdBy: req.user.id,
+      createdAt: new Date(),
+    });
+
+    // Restore items from snapshot
+    project.items = snapshot.items.map((i) => ({
+      itemId: i.itemId || null,
+      name: i.name,
+      quantityRequired: i.quantityRequired,
+      quantityCollected: 0,
+      dependencies: i.dependencies || [],
+      status: "pending",
+    }));
+    project.currentPlanVersion = currentVersion + 1;
+
+    // Recompute statuses
+    const computed = computeItemStatuses(project);
+    for (let i = 0; i < project.items.length; i++) {
+      project.items[i].status = computed.items[i].status;
+    }
+
+    pushEvent(project, {
+      type: "plan_update",
+      actor: { id: req.user.id, username: req.user.username },
+      message: `${req.user.username} restored plan to v${targetVersion}`,
+    });
+
+    await project.save();
+
+    return res.json({
+      success: true,
+      data: project,
+      currentPlanVersion: project.currentPlanVersion,
+      message: `Restored to v${targetVersion}`,
+    });
+  } catch (err) {
+    console.error("POST restore-plan error:", err);
     return res.status(500).json({ success: false, message: "Server error." });
   }
 });
@@ -552,8 +946,6 @@ router.post("/:id/contribute", authMiddleware, async (req, res) => {
     const acceptedQuantity = Math.min(parsedQty, remaining);
 
     // ── 7. Snapshot: was this item complete BEFORE the update? ──
-    // Used later to detect the completion transition for the
-    // "item_completed" auto-event.
     const wasCompletedBefore = targetItem.quantityCollected >= targetItem.quantityRequired;
 
     // ── 8. Build contribution record ─────────────
@@ -566,9 +958,6 @@ router.post("/:id/contribute", authMiddleware, async (req, res) => {
     };
 
     // ── 9. Build events to push ──────────────────
-    // We always push a "contribution" event.
-    // If the item transitions to completed, we also
-    // push an "item_completed" event.
     const eventsToAdd = [
       {
         type: "contribution",
@@ -579,7 +968,6 @@ router.post("/:id/contribute", authMiddleware, async (req, res) => {
       },
     ];
 
-    // Will the item be completed after this update?
     const willBeCompleted =
       (targetItem.quantityCollected + acceptedQuantity) >= targetItem.quantityRequired;
 
@@ -641,23 +1029,18 @@ router.post("/:id/contribute", authMiddleware, async (req, res) => {
         const freshAccepted = Math.min(parsedQty, freshRemaining);
         contribution.quantity = freshAccepted;
 
-        // Update contribution event's quantity to match fresh data
         eventsToAdd[0].meta.quantity = freshAccepted;
         eventsToAdd[0].message = `${req.user.username} contributed ${freshAccepted} ${targetItem.name}`;
 
-        // Recheck completion transition with fresh data
         const freshWillComplete =
           (freshItem.quantityCollected + freshAccepted) >= freshItem.quantityRequired;
         const freshWasComplete =
           freshItem.quantityCollected >= freshItem.quantityRequired;
 
-        // Remove or add item_completed event based on fresh data
         if (freshWasComplete || !freshWillComplete) {
-          // Remove item_completed event if it was added
           const idx = eventsToAdd.findIndex((e) => e.type === "item_completed");
           if (idx !== -1) eventsToAdd.splice(idx, 1);
         } else if (!freshWasComplete && freshWillComplete) {
-          // Ensure item_completed event exists
           if (!eventsToAdd.some((e) => e.type === "item_completed")) {
             eventsToAdd.push({
               type: "item_completed",
@@ -669,7 +1052,6 @@ router.post("/:id/contribute", authMiddleware, async (req, res) => {
           }
         }
 
-        // Build the $push for events — push all events at once
         const updateOps = {
           $inc: { "items.$.quantityCollected": freshAccepted },
           $push: {
@@ -697,7 +1079,6 @@ router.post("/:id/contribute", authMiddleware, async (req, res) => {
         session.endSession();
         usedTransaction = true;
 
-        // Re-read and cap events if needed
         updatedProject = await Project.findById(projectId);
         if (updatedProject && updatedProject.events.length > EVENT_CAP) {
           updatedProject.events = updatedProject.events.slice(-EVENT_CAP);
@@ -764,7 +1145,6 @@ router.post("/:id/contribute", authMiddleware, async (req, res) => {
         });
       }
 
-      // Cap events after fallback update
       if (updatedProject.events && updatedProject.events.length > EVENT_CAP) {
         updatedProject.events = updatedProject.events.slice(-EVENT_CAP);
         await updatedProject.save();
@@ -803,11 +1183,6 @@ router.post("/:id/contribute", authMiddleware, async (req, res) => {
 // ═══════════════════════════════════════════════
 // GET /api/projects/:id/activity — Activity feed
 // ═══════════════════════════════════════════════
-// Returns the most recent events, newest first.
-// Query params:
-//   ?limit=20 – max events to return (default 20)
-//
-// No auth required for now.
 router.get("/:id/activity", async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -827,7 +1202,6 @@ router.get("/:id/activity", async (req, res) => {
       200
     );
 
-    // Return newest first, limited
     const events = (project.events || [])
       .slice(-limit)
       .reverse();

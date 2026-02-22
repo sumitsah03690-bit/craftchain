@@ -9,6 +9,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api";
+import { useAuth } from "../contexts/AuthContext.jsx";
 import ProjectHeader from "../components/ProjectHeader.jsx";
 import ItemCard from "../components/ItemCard.jsx";
 import ContributionModal from "../components/ContributionModal.jsx";
@@ -16,15 +17,22 @@ import ActivityFeed from "../components/ActivityFeed.jsx";
 import DependencyTree from "../components/DependencyTree.jsx";
 import MinecraftIcon from "../components/MinecraftIcon.jsx";
 import Toast from "../components/Toast.jsx";
+import RoleManager from "../components/RoleManager.jsx";
+import SuggestedTasks from "../components/SuggestedTasks.jsx";
+import PlanHistory from "../components/PlanHistory.jsx";
 import demoData from "../data/demoProject.json";
 
 export default function ProjectPage() {
   const { id } = useParams();
+  const { user, authFetch } = useAuth();
 
   const [project, setProject] = useState(null);
   const [progress, setProgress] = useState(null);
   const [bottlenecks, setBottlenecks] = useState([]);
   const [contributionSummary, setContributionSummary] = useState([]);
+  const [memberRoles, setMemberRoles] = useState([]);
+  const [suggestedTasks, setSuggestedTasks] = useState([]);
+  const [currentPlanVersion, setCurrentPlanVersion] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [networkError, setNetworkError] = useState(false);
@@ -63,6 +71,9 @@ export default function ProjectPage() {
         setProgress(json.progress);
         setBottlenecks(json.bottlenecks || []);
         setContributionSummary(json.contributionSummary || []);
+        setMemberRoles(json.memberRoles || []);
+        setSuggestedTasks(json.suggestedTasks || []);
+        setCurrentPlanVersion(json.currentPlanVersion || 1);
         setError(null);
         setNetworkError(false);
         setIsDemoMode(false);
@@ -277,6 +288,17 @@ export default function ProjectPage() {
           </div>
         </div>
 
+        {/* Suggested Tasks */}
+        <SuggestedTasks
+          tasks={suggestedTasks}
+          onContribute={(itemName) => {
+            const item = items.find(
+              (i) => i.name.toLowerCase().trim() === itemName.toLowerCase().trim()
+            );
+            if (item) setModalItem(item);
+          }}
+        />
+
         {/* Items Grid */}
         <div className="section-title">Items Required</div>
         <div className="items-grid">
@@ -298,10 +320,32 @@ export default function ProjectPage() {
 
         {/* Dependency Tree */}
         <DependencyTree finalItem={project.finalItem} />
+
+        {/* Plan History */}
+        <PlanHistory
+          projectId={id}
+          currentVersion={currentPlanVersion}
+          isOwner={user && project.createdBy && String(project.createdBy) === String(user.id)}
+          onRestore={(updatedProject) => {
+            setProject(updatedProject);
+            fetchProject();
+          }}
+        />
       </div>
 
       {/* ── Right Sidebar ────────────────────── */}
       <div className="project-right">
+        {/* Role Manager */}
+        <RoleManager
+          projectId={id}
+          memberRoles={memberRoles}
+          isOwner={user && project.createdBy && String(project.createdBy) === String(user.id)}
+          onRoleChanged={(updatedMembers) => {
+            // Refresh member roles from updated members data
+            fetchProject();
+          }}
+        />
+
         <ActivityFeed key={reloadKey} projectId={id} />
 
         {/* Team Contributions */}

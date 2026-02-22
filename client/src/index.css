@@ -1882,3 +1882,301 @@ input {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
+
+/* ═══════════════════════════════════════════════
+   Role Manager
+   ═══════════════════════════════════════════════ */
+.role-manager {
+  margin-bottom: 18px;
+  padding: 14px;
+  background: rgba(26, 20, 16, 0.5);
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+}
+.role-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.role-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.role-member-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.role-member-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.role-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--mc-green), var(--mc-dark-green));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.role-member-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.role-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.role-owner {
+  background: rgba(241, 196, 15, 0.2);
+  color: var(--mc-gold);
+}
+.role-miner {
+  background: rgba(76, 175, 80, 0.2);
+  color: var(--mc-green);
+}
+.role-builder {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+}
+.role-planner {
+  background: rgba(33, 150, 243, 0.2);
+  color: #42a5f5;
+}
+.role-member {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+.role-select {
+  font-size: 12px;
+  padding: 4px 8px;
+  background: var(--bg-darkest);
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.role-select:hover {
+  border-color: var(--mc-green);
+}
+.role-select:focus {
+  border-color: var(--mc-green);
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.15);
+}
+
+/* ═══════════════════════════════════════════════
+   Suggested Tasks
+   ═══════════════════════════════════════════════ */
+.suggested-tasks {
+  margin-bottom: 20px;
+}
+.suggested-tasks-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 10px 0;
+}
+.suggested-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.suggested-task-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(76, 175, 80, 0.06);
+  border: 1px solid rgba(76, 175, 80, 0.15);
+  border-radius: 8px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.suggested-task-card:hover {
+  background: rgba(76, 175, 80, 0.12);
+  border-color: rgba(76, 175, 80, 0.3);
+}
+.suggested-task-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.suggested-task-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.suggested-task-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.suggested-task-reason {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.suggested-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.suggested-task-remaining {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mc-green);
+}
+.suggested-task-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--mc-green);
+  color: #fff;
+  border: none;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.15s;
+}
+.suggested-task-btn:hover {
+  background: var(--mc-dark-green);
+  transform: scale(1.1);
+}
+
+/* ═══════════════════════════════════════════════
+   Plan History
+   ═══════════════════════════════════════════════ */
+.plan-history {
+  margin-top: 20px;
+  background: rgba(26, 20, 16, 0.45);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.plan-history-header {
+  padding: 12px 16px;
+  user-select: none;
+  transition: background 0.15s;
+}
+.plan-history-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.plan-history-version-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--mc-green);
+  font-weight: 600;
+}
+.plan-history-body {
+  padding: 0 16px 16px;
+}
+.plan-history-loading,
+.plan-history-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 6px 0;
+}
+.plan-history-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  padding-left: 20px;
+}
+.plan-history-timeline::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--card-border);
+}
+.plan-version-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  position: relative;
+}
+.plan-version-dot {
+  position: absolute;
+  left: -16px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  border: 2px solid var(--bg-dark);
+  z-index: 1;
+}
+.plan-version-dot.current {
+  background: var(--mc-green);
+  box-shadow: 0 0 6px rgba(76, 175, 80, 0.5);
+}
+.plan-version-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.plan-version-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.plan-version-current .plan-version-label {
+  color: var(--mc-green);
+}
+.plan-version-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.plan-version-restore-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--mc-green);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.plan-version-restore-btn:hover {
+  background: rgba(76, 175, 80, 0.15);
+  border-color: var(--mc-green);
+}
+.plan-version-restore-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

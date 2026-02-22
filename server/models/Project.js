@@ -83,6 +83,8 @@ const ContributionSchema = new mongoose.Schema(
 );
 
 // ── Member sub-schema ───────────────────────────
+const VALID_ROLES = ["owner", "member", "miner", "builder", "planner"];
+
 const MemberSchema = new mongoose.Schema(
   {
     userId: {
@@ -92,10 +94,11 @@ const MemberSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      default: "member", // sensible default; creator gets "owner"
+      enum: VALID_ROLES,
+      default: "member",
     },
   },
-  { _id: false } // no need for a separate _id per member entry
+  { _id: false }
 );
 
 // ── Event sub-schema ────────────────────────────
@@ -106,7 +109,7 @@ const EventSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ["create", "join", "contribution", "item_completed"],
+      enum: ["create", "join", "contribution", "item_completed", "role_change", "plan_update"],
       required: true,
     },
     actor: {
@@ -125,6 +128,20 @@ const EventSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+  },
+  { _id: true }
+);
+
+// ── Plan Version sub-schema ─────────────────────
+// Append-only snapshot of the items array whenever
+// the crafting plan is updated.
+const PlanVersionSchema = new mongoose.Schema(
+  {
+    version: { type: Number, required: true },
+    label: { type: String, default: "" },
+    items: { type: [ItemSchema], required: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    createdAt: { type: Date, default: Date.now },
   },
   { _id: true }
 );
@@ -161,6 +178,14 @@ const ProjectSchema = new mongoose.Schema({
   events: {
     type: [EventSchema],
     default: [],
+  },
+  planVersions: {
+    type: [PlanVersionSchema],
+    default: [],
+  },
+  currentPlanVersion: {
+    type: Number,
+    default: 1,
   },
   createdAt: {
     type: Date,
