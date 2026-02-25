@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [resolvedItems, setResolvedItems] = useState([]);
   const [resolving, setResolving] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const [targetQty, setTargetQty] = useState(1);
   const [createError, setCreateError] = useState(null);
   const [creating, setCreating] = useState(false);
   const searchRef = useRef(null);
@@ -95,7 +96,7 @@ export default function Dashboard() {
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          api(`/api/recipes/search?q=${encodeURIComponent(searchQuery)}`)
+          api(`/api/recipes/search?q=${encodeURIComponent(searchQuery)}`),
         );
         const json = await res.json();
         if (json.success) {
@@ -124,7 +125,7 @@ export default function Dashboard() {
 
     if (!item.hasRecipe) {
       setCreateError(
-        "This item has no crafting recipe. You can still create a project and add items manually."
+        "This item has no crafting recipe. You can still create a project and add items manually.",
       );
       return;
     }
@@ -133,14 +134,14 @@ export default function Dashboard() {
     setResolving(true);
     try {
       const res = await fetch(
-        api(`/api/recipes/lookup?item=${encodeURIComponent(item.name)}`)
+        api(`/api/recipes/lookup?item=${encodeURIComponent(item.name)}`),
       );
       const json = await res.json();
       if (json.success && json.data.items?.length > 0) {
         setResolvedItems(json.data.items);
       } else {
         setCreateError(
-          json.data?.message || "No recipe found. Add items manually."
+          json.data?.message || "No recipe found. Add items manually.",
         );
       }
     } catch {
@@ -158,11 +159,12 @@ export default function Dashboard() {
     setCreating(true);
 
     try {
+      const qty = Math.max(1, Math.floor(targetQty));
       const items =
         resolvedItems.length > 0
           ? resolvedItems.map((i) => ({
               name: i.name,
-              quantityRequired: i.quantityRequired,
+              quantityRequired: (i.quantityRequired || 1) * qty,
               dependencies: i.dependencies || [],
             }))
           : [];
@@ -206,6 +208,7 @@ export default function Dashboard() {
     setResolvedItems([]);
     setResolving(false);
     setProjectName("");
+    setTargetQty(1);
     setCreateError(null);
   };
 
@@ -251,9 +254,7 @@ export default function Dashboard() {
             {/* ── Search Bar ──────────────────── */}
             <div className="search-container" ref={searchRef}>
               <div className="input-group">
-                <label className="input-label">
-                  🔍 Search Minecraft Item
-                </label>
+                <label className="input-label">🔍 Search Minecraft Item</label>
                 <input
                   type="text"
                   className="input-field search-input"
@@ -265,7 +266,9 @@ export default function Dashboard() {
                     setResolvedItems([]);
                     setCreateError(null);
                   }}
-                  onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                  onFocus={() =>
+                    suggestions.length > 0 && setShowSuggestions(true)
+                  }
                   autoFocus
                 />
               </div>
@@ -305,9 +308,7 @@ export default function Dashboard() {
               <div className="recipe-preview">
                 <div className="loading-container">
                   <div className="spinner" />
-                  <span style={{ marginLeft: 8 }}>
-                    Looking up recipe...
-                  </span>
+                  <span style={{ marginLeft: 8 }}>Looking up recipe...</span>
                 </div>
               </div>
             )}
@@ -318,7 +319,8 @@ export default function Dashboard() {
                   <MinecraftIcon name={selectedItem.name} size={36} />
                   <div>
                     <div className="recipe-title">
-                      {selectedItem.displayName || formatItemName(selectedItem.name)}
+                      {selectedItem.displayName ||
+                        formatItemName(selectedItem.name)}
                     </div>
                     <div className="recipe-subtitle">
                       {resolvedItems.length} materials needed
@@ -333,18 +335,45 @@ export default function Dashboard() {
                         {formatItemName(item.name)}
                       </span>
                       <span className="recipe-item-qty">
-                        ×{item.quantityRequired}
+                        ×
+                        {(item.quantityRequired || 1) *
+                          Math.max(1, Math.floor(targetQty))}
                       </span>
-                      {item.raw && (
-                        <span className="recipe-item-raw">RAW</span>
-                      )}
+                      {item.raw && <span className="recipe-item-raw">RAW</span>}
                     </div>
                   ))}
                 </div>
 
-                {/* Project name + submit */}
+                {/* Project name + target qty + submit */}
                 <form onSubmit={handleCreate}>
                   <div className="input-group" style={{ marginTop: 16 }}>
+                    <label className="input-label">Target Quantity</label>
+                    <input
+                      type="number"
+                      className="input-field"
+                      min={1}
+                      max={999}
+                      value={targetQty}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (v > 0 && v <= 999) setTargetQty(v);
+                        else if (e.target.value === "") setTargetQty(1);
+                      }}
+                      style={{ maxWidth: 120 }}
+                    />
+                    <span
+                      className="input-hint"
+                      style={{
+                        fontSize: "0.82rem",
+                        color: "#999",
+                        marginTop: 4,
+                      }}
+                    >
+                      How many {formatItemName(selectedItem?.name || "items")}{" "}
+                      do you want?
+                    </span>
+                  </div>
+                  <div className="input-group" style={{ marginTop: 12 }}>
                     <label className="input-label">Project Name</label>
                     <input
                       type="text"
@@ -389,10 +418,7 @@ export default function Dashboard() {
             {/* Cancel button when nothing resolved yet */}
             {!selectedItem && !resolving && (
               <div className="create-form-actions" style={{ marginTop: 12 }}>
-                <button
-                  className="btn btn-secondary"
-                  onClick={resetCreate}
-                >
+                <button className="btn btn-secondary" onClick={resetCreate}>
                   Cancel
                 </button>
               </div>

@@ -28,6 +28,7 @@ export default function ServerPage() {
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [projectItem, setProjectItem] = useState("");
+  const [projectTargetQty, setProjectTargetQty] = useState(1);
   const [creatingProject, setCreatingProject] = useState(false);
   const [createProjectError, setCreateProjectError] = useState("");
 
@@ -74,6 +75,7 @@ export default function ServerPage() {
     setCreatingProject(true);
     setCreateProjectError("");
     try {
+      const qty = Math.max(1, Math.floor(projectTargetQty));
       const res = await authFetch("/api/projects", {
         method: "POST",
         body: JSON.stringify({
@@ -81,7 +83,7 @@ export default function ServerPage() {
           finalItem: projectItem.trim(),
           serverId: id,
           autoFillFromMinecraft: true,
-          items: [{ name: projectItem.trim(), quantityRequired: 1 }],
+          items: [{ name: projectItem.trim(), quantityRequired: 1 * qty }],
         }),
       });
       const json = await res.json();
@@ -89,6 +91,7 @@ export default function ServerPage() {
         setShowCreateProject(false);
         setProjectName("");
         setProjectItem("");
+        setProjectTargetQty(1);
         setCreateProjectError("");
         navigate(`/projects/${json.data._id}`);
       } else {
@@ -244,6 +247,22 @@ export default function ServerPage() {
                 onChange={(e) => setProjectItem(e.target.value)}
                 maxLength={50}
               />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                <label style={{ fontSize: "0.9rem", color: "#ccc", whiteSpace: "nowrap" }}>Target Qty:</label>
+                <input
+                  type="number"
+                  className="join-code-input"
+                  min={1}
+                  max={999}
+                  value={projectTargetQty}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (v > 0 && v <= 999) setProjectTargetQty(v);
+                    else if (e.target.value === "") setProjectTargetQty(1);
+                  }}
+                  style={{ maxWidth: 80 }}
+                />
+              </div>
               {createProjectError && (
                 <div className="auth-error" style={{ marginTop: 12, marginBottom: 8 }}>
                   {createProjectError}

@@ -57,6 +57,11 @@ export default function ProjectPage() {
 
   // ── Quantity state (single source of truth) ──
   const [quantity, setQuantity] = useState(1);
+  // Track the "base" multiplier that was used to create the project's items
+  // so we can compute per-1 recipe amounts for re-scaling.
+  const [savedQuantity, setSavedQuantity] = useState(1);
+  const [showQtyConfirm, setShowQtyConfirm] = useState(false);
+  const [savingQty, setSavingQty] = useState(false);
 
   // ── Delete project state ────────────────────
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -213,15 +218,54 @@ export default function ProjectPage() {
   // ── Compute stats from project items ────────
   const items = project?.items || [];
 
-  // Scale quantityRequired by the crafting-tree quantity
+  // Scale quantityRequired by the crafting-tree quantity.
+  // We derive base (per-1) amounts from the saved quantity.
   const scaledItems = useMemo(
     () =>
-      items.map((item) => ({
-        ...item,
-        quantityRequired: (item.quantityRequired || 0) * quantity,
-      })),
-    [items, quantity]
+      items.map((item) => {
+        const base = savedQuantity > 0 ? Math.round((item.quantityRequired || 0) / savedQuantity) : (item.quantityRequired || 0);
+        return {
+          ...item,
+          quantityRequired: Math.max(1, base * quantity),
+        };
+      }),
+    [items, quantity, savedQuantity]
   );
+
+  const quantityChanged = quantity !== savedQuantity;
+
+  // ── Apply quantity change handler ────────────
+  const handleApplyQuantity = useCallback(async () => {
+    if (!project || savingQty) return;
+    setSavingQty(true);
+    try {
+      const newItems = items.map((item) => {
+        const base = savedQuantity > 0 ? Math.round((item.quantityRequired || 0) / savedQuantity) : (item.quantityRequired || 0);
+        return {
+          name: item.name,
+          quantityRequired: Math.max(1, base * quantity),
+          dependencies: item.dependencies || [],
+        };
+      });
+      const res = await authFetch(`/api/projects/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ items: newItems }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSavedQuantity(quantity);
+        setToast({ visible: true, message: `✅ Quantities updated to ×${quantity}` });
+        fetchProject();
+      } else {
+        setToast({ visible: true, message: json.message || "Failed to update quantities." });
+      }
+    } catch {
+      setToast({ visible: true, message: "Network error. Could not update quantities." });
+    } finally {
+      setSavingQty(false);
+      setShowQtyConfirm(false);
+    }
+  }, [project, items, quantity, savedQuantity, id, authFetch, savingQty, fetchProject]);
 
   const totalItems = items.length;
   const completedCount = items.filter((i) => i.status === "completed").length;
@@ -364,6 +408,29 @@ export default function ProjectPage() {
           onQuantityChange={setQuantity}
         />
 
+        {/* Apply Quantity Button */}
+        {quantityChanged && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, marginBottom: 16 }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowQtyConfirm(true)}
+              disabled={savingQty}
+            >
+              {savingQty ? "Saving..." : `💾 Apply ×${quantity} to Items`}
+            </button>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setQuantity(savedQuantity)}
+              disabled={savingQty}
+            >
+              Cancel
+            </button>
+            <span style={{ fontSize: "0.82rem", color: "#ffaa00" }}>
+              ⚠ Applying will reset all contributions to 0
+            </span>
+          </div>
+        )}
+
         {/* Plan History */}
         <PlanHistory
           projectId={id}
@@ -456,6 +523,17 @@ export default function ProjectPage() {
         message={toast.message}
         visible={toast.visible}
         onDone={() => setToast({ visible: false, message: "" })}
+      />
+
+      {/* ── Quantity Change Confirmation ────────── */}
+      <ConfirmModal
+        open={showQtyConfirm}
+        title={`Apply ×${quantity} Quantity?`}
+        message={`This will update all item quantities to ×${quantity} and reset all contributions to 0. This cannot be undone.`}
+        confirmText={savingQty ? "Saving..." : "Apply Changes"}
+        danger
+        onConfirm={handleApplyQuantity}
+        onCancel={() => setShowQtyConfirm(false)}
       />
 
       {/* ── Delete Project Confirmation ────────── */}
