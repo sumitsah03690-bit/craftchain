@@ -27,6 +27,7 @@ export default function ProjectHeader({ project, progress }) {
           <ProgressBar
             percent={progress?.percent || 0}
             height={10}
+            variant="xp"
           />
           <span className="project-header-percent">
             {(progress?.percent || 0).toFixed(1)}%

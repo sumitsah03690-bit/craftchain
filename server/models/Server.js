@@ -45,6 +45,21 @@ const ServerSchema = new mongoose.Schema({
     default: generateJoinCode,
   },
 
+  // Self-assignable member roles (userId string → role string)
+  memberRoles: {
+    type: Map,
+    of: String,
+    default: {},
+  },
+
+  // Optional Discord/chat link
+  discordLink: {
+    type: String,
+    trim: true,
+    maxlength: 200,
+    default: "",
+  },
+
   createdAt: {
     type: Date,
     default: Date.now,

@@ -74,11 +74,12 @@ function TreeNode({ node, depth = 0, defaultExpanded = true }) {
 }
 
 // ── Main DependencyTree ──────────────────────────
-export default function DependencyTree({ finalItem }) {
+export default function DependencyTree({ finalItem, quantity = 1, onQuantityChange }) {
   const [tree, setTree] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [quantity, setQuantity] = useState(1);
+
+  const setQuantity = onQuantityChange || (() => {});
 
   const fetchTree = useCallback(() => {
     if (!finalItem) return;

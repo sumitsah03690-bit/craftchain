@@ -225,6 +225,16 @@ export default function Dashboard() {
 
   return (
     <div>
+      {/* ── Floating Particles ───────────────────── */}
+      <div className="dashboard-particles" aria-hidden="true">
+        <span className="particle dp1">⛏</span>
+        <span className="particle dp2">💎</span>
+        <span className="particle dp3">🟩</span>
+        <span className="particle dp4">⬛</span>
+        <span className="particle dp5">🪨</span>
+        <span className="particle dp6">🔥</span>
+      </div>
+
       {/* ── Header ──────────────────────────────── */}
       <div className="dashboard-header">
         <h1>⛏ Dashboard</h1>
@@ -459,7 +469,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="project-card-progress">
-                <ProgressBar percent={p.progressPercent || 0} height={6} />
+                <ProgressBar percent={p.progressPercent || 0} height={6} variant="xp" />
                 <span className="project-card-percent">
                   {(p.progressPercent || 0).toFixed(0)}%
                 </span>

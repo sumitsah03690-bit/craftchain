@@ -1,6 +1,6 @@
 // ──────────────────────────────────────────────
-// Toast — Minimal auto-dismiss notification.
-// Pure CSS animation, no external libraries.
+// Toast — Minecraft achievement-style notification
+// with "[Achievement Get!]" pixel-font header.
 // ──────────────────────────────────────────────
 
 import { useEffect } from "react";
@@ -16,7 +16,10 @@ export default function Toast({ message, visible, onDone, duration = 3000 }) {
 
   return (
     <div className="toast-container" role="status" aria-live="polite">
-      <div className="toast">{message}</div>
+      <div className="toast">
+        <div className="toast-header">★ Achievement Get! ★</div>
+        {message}
+      </div>
     </div>
   );
 }

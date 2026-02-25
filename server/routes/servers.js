@@ -153,10 +153,16 @@ router.get("/:id", authMiddleware, async (req, res) => {
       let role = "member";
       if (uid === server.owner.toString()) role = "owner";
       else if (moderatorSet.has(uid)) role = "moderator";
+
+      // Minecraft self-assigned role (from memberRoles map)
+      const rolesMap = server.memberRoles || {};
+      const mcRole = (rolesMap instanceof Map ? rolesMap.get(uid) : rolesMap[uid]) || "member";
+
       return {
         _id: uid,
         username: u ? u.username : "Unknown",
         role,
+        mcRole,
       };
     });
 
@@ -171,6 +177,7 @@ router.get("/:id", authMiddleware, async (req, res) => {
         callerRole,
         projects,
         membersList,
+        discordLink: server.discordLink || "",
       },
     });
   } catch (err) {
@@ -338,4 +345,146 @@ router.patch("/:id/members/:userId", authMiddleware, async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════
+// PATCH /api/servers/:id/my-role — Self-assign
+// Minecraft role (farmer, miner, builder, etc.)
+// ═══════════════════════════════════════════════
+const VALID_MC_ROLES = [
+  "member", "miner", "builder", "farmer",
+  "nether_specialist", "redstoner", "enchanter",
+];
+
+router.patch("/:id/my-role", authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid server ID." });
+    }
+
+    const { role } = req.body;
+    if (!role || !VALID_MC_ROLES.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: `Role must be one of: ${VALID_MC_ROLES.join(", ")}`,
+      });
+    }
+
+    const server = await Server.findById(req.params.id);
+    if (!server) {
+      return res.status(404).json({ success: false, message: "Server not found." });
+    }
+
+    const userId = req.user.id.toString();
+    const isMember =
+      server.owner.toString() === userId ||
+      (server.members || []).some((m) => m.toString() === userId);
+
+    if (!isMember) {
+      return res.status(403).json({ success: false, message: "Not a member." });
+    }
+
+    // Set the role in memberRoles map
+    if (!server.memberRoles) server.memberRoles = new Map();
+    server.memberRoles.set(userId, role);
+    server.markModified("memberRoles");
+    await server.save();
+
+    return res.json({
+      success: true,
+      message: `Your role is now ${role}.`,
+      data: { role },
+    });
+  } catch (err) {
+    console.error("PATCH /my-role error:", err);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══════════════════════════════════════════════
+// PATCH /api/servers/:id/discord-link
+// Owner-only: set or clear the Discord link
+// ═══════════════════════════════════════════════
+router.patch("/:id/discord-link", authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid server ID." });
+    }
+
+    const server = await Server.findById(req.params.id);
+    if (!server) {
+      return res.status(404).json({ success: false, message: "Server not found." });
+    }
+
+    if (server.owner.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: "Owner only." });
+    }
+
+    const { discordLink } = req.body;
+    server.discordLink = (discordLink || "").trim().slice(0, 200);
+    await server.save();
+
+    return res.json({
+      success: true,
+      message: "Discord link updated.",
+      data: { discordLink: server.discordLink },
+    });
+  } catch (err) {
+    console.error("PATCH /discord-link error:", err);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+// ═══════════════════════════════════════════════
+// GET /api/servers/:id/activity
+// Aggregate recent events from all server projects
+// ═══════════════════════════════════════════════
+router.get("/:id/activity", authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid server ID." });
+    }
+
+    const server = await Server.findById(req.params.id).lean();
+    if (!server) {
+      return res.status(404).json({ success: false, message: "Server not found." });
+    }
+
+    // Verify membership
+    const userId = req.user.id.toString();
+    const isMember =
+      server.owner.toString() === userId ||
+      (server.members || []).some((m) => m.toString() === userId);
+
+    if (!isMember) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
+    // Get all projects for this server, only fetching events + name
+    const projects = await Project.find({ serverId: server._id })
+      .select("name events")
+      .lean();
+
+    // Aggregate and flatten events across all projects
+    let allEvents = [];
+    for (const p of projects) {
+      for (const ev of p.events || []) {
+        allEvents.push({
+          ...ev,
+          projectName: p.name,
+          projectId: p._id,
+        });
+      }
+    }
+
+    // Sort by timestamp desc, limit 30
+    allEvents.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    allEvents = allEvents.slice(0, 30);
+
+    return res.json({ success: true, data: allEvents });
+  } catch (err) {
+    console.error("GET /activity error:", err);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
 module.exports = router;
+
